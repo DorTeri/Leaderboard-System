@@ -1,0 +1,69 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: leaderboard
+      POSTGRES_PASSWORD: leaderboard_secret
+      POSTGRES_DB: leaderboard
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leaderboard"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build: .
+    command: ["sh", "-c", "node ./node_modules/typeorm/cli.js migration:run -d dist/database/data-source.js"]
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USERNAME: leaderboard
+      DB_PASSWORD: leaderboard_secret
+      DB_DATABASE: leaderboard
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USERNAME: leaderboard
+      DB_PASSWORD: leaderboard_secret
+      DB_DATABASE: leaderboard
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      LEADERBOARD_ZSET_KEY: "leaderboard:zset"
+      DEFAULT_TOP_LIMIT: "100"
+      MAX_TOP_LIMIT: "1000"
+      TOP_CACHE_TTL_SECONDS: "10"
+      LEADERBOARD_NEIGHBOR_COUNT: "5"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:

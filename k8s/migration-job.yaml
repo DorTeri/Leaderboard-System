@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: leaderboard-migration
+  namespace: leaderboard
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: leaderboard-api:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              node ./node_modules/typeorm/cli.js \
+                migration:run -d dist/database/data-source.js && \
+              echo "Migrations complete. Rebuilding Redis ZSET..." && \
+              node dist/scripts/redis-rebuild.js
+          envFrom:
+            - configMapRef:
+                name: leaderboard-config
+            - secretRef:
+                name: leaderboard-secret
