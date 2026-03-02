@@ -100,12 +100,6 @@ CREATE INDEX "idx_users_score_nonzero" ON "users" ("score" DESC, "id" ASC) WHERE
 - **Partial index `(score > 0)`** — Excludes inactive users (score 0). If 70% of 10M users never scored, this index is 70% smaller and faster for any fallback queries.
 - **BIGSERIAL PK** — Auto-incrementing 64-bit ID supports well beyond 10M users and maps directly to the ZSET member encoding.
 
-### Partitioning
-
-**Not used** for the global leaderboard. A global ranking requires data from all partitions — queries must merge across partitions, eliminating pruning benefits. Score-based range partitioning would also require cross-partition row movement on every score update (implemented as DELETE + INSERT), which is prohibitively expensive.
-
-**When it would help:** Time-windowed or seasonal leaderboards, where each season/week/region has its own partition and its own Redis ZSET key (e.g., `leaderboard:season:1:zset`). Queries for a single season prune to one partition.
-
 ## API Endpoints
 
 | Method | Endpoint | Postgres | Redis |
